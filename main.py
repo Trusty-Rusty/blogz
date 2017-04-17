@@ -11,7 +11,7 @@ class BlogHandler(webapp2.RequestHandler):
 
     def get_posts(self, limit, offset):
         """ Get all posts ordered by creation date (descending) """
-        query = Post.all().order('-created')            #Why not a GQL-style Query?
+        query = Post.all().order('-created')            #App engine query style allows more detailed filtering
         return query.fetch(limit=limit, offset=offset)
 
     def get_posts_by_user(self, user, limit, offset):
@@ -19,9 +19,10 @@ class BlogHandler(webapp2.RequestHandler):
             Get all posts by a specific user, ordered by creation date (descending).
             The user parameter will be a User object.
         """
-
         # TODO - filter the query so that only posts by the given user
-        return None
+        query = Post.all().order('-created')
+        query.filter('author =', user)
+        return query.fetch(limit=limit, offset=offset)
 
     def get_user_by_name(self, username):
         """ Get a user object from the db, based on their username """
