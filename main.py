@@ -1,7 +1,7 @@
 import webapp2, jinja2, os, re
 from google.appengine.ext import db
-from models import Post, User
-import hashutils
+from models import Post, User   #import db classes from models.py
+import hashutils                #provided file w/ func for password and cookie security
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir), autoescape = True)
@@ -11,7 +11,7 @@ class BlogHandler(webapp2.RequestHandler):
 
     def get_posts(self, limit, offset):
         """ Get all posts ordered by creation date (descending) """
-        query = Post.all().order('-created')
+        query = Post.all().order('-created')            #Why not a GQL-style Query?
         return query.fetch(limit=limit, offset=offset)
 
     def get_posts_by_user(self, user, limit, offset):
@@ -25,27 +25,27 @@ class BlogHandler(webapp2.RequestHandler):
 
     def get_user_by_name(self, username):
         """ Get a user object from the db, based on their username """
-        user = db.GqlQuery("SELECT * FROM User WHERE username = '%s'" % username)
+        user = db.GqlQuery("SELECT * FROM User WHERE username = '%s'" % username) #string sub that plugs var into string
         if user:
-            return user.get()
+            return user.get()       #Get all info for the requested user
 
     def login_user(self, user):
-        """ Login a user specified by a User object user """
-        user_id = user.key().id()
-        self.set_secure_cookie('user_id', str(user_id))
+        """ Login a user specified by a User object user by setting a secure cookie """
+        user_id = user.key().id()                           #Same wacky python-style query to get id out of key
+        self.set_secure_cookie('user_id', str(user_id))     #uses a util method to ...
 
     def logout_user(self):
         """ Logout a user specified by a User object user """
-        self.set_secure_cookie('user_id', '')
+        self.set_secure_cookie('user_id', '')               #log user out by changing user_id to '' in secure cookie
 
     def read_secure_cookie(self, name):
-        cookie_val = self.request.cookies.get(name)
+        cookie_val = self.request.cookies.get(name)         #retrieve name of secure cookie
         if cookie_val:
-            return hashutils.check_secure_val(cookie_val)
+            return hashutils.check_secure_val(cookie_val)   #if cookie has a value for name, check in hashutils
 
     def set_secure_cookie(self, name, val):
         cookie_val = hashutils.make_secure_val(val)
-        self.response.headers.add_header('Set-Cookie', '%s=%s; Path=/' % (name, cookie_val))
+        self.response.headers.add_header('Set-Cookie', '%s=%s; Path=/' % (name, cookie_val))    #swap name for a secure version
 
     def initialize(self, *a, **kw):
         """
@@ -54,28 +54,27 @@ class BlogHandler(webapp2.RequestHandler):
             must be signed in to access the path/resource.
         """
         webapp2.RequestHandler.initialize(self, *a, **kw)
-        uid = self.read_secure_cookie('user_id')
-        self.user = uid and User.get_by_id(int(uid))
+        uid = self.read_secure_cookie('user_id')            #get user id from the cookie
+        self.user = uid and User.get_by_id(int(uid))        #Check for that id in the db to see if they're logged in
 
-        if not self.user and self.request.path in auth_paths:
-            self.redirect('/login')
+        if not self.user and self.request.path in auth_paths:   #if not logged in as user and they are trying to view certain paths...
+            self.redirect('/login')                         #then redirect
 
 class IndexHandler(BlogHandler):
-
+    """renders main blog page with list of all users"""
     def get(self):
         """ List all blog users """
-        users = User.all()
+        users = User.all()                          #query all user entities
         t = jinja_env.get_template("index.html")
         response = t.render(users = users)
         self.response.write(response)
 
 class BlogIndexHandler(BlogHandler):
-
+    """render page of posts for specifc user, 5 at a time"""
     # number of blog posts per page to display
     page_size = 5
 
     def get(self, username=""):
-        """ """
 
         # If request is for a specific page, set page number and offset accordingly
         page = self.request.get("page")
@@ -157,7 +156,7 @@ class ViewPostHandler(BlogHandler):
             t = jinja_env.get_template("post.html")
             response = t.render(post=post)
         else:
-            error = "there is no post with id %s" % id
+            error = "there is no post with id %s" % id      #Error for id with no corresponding post
             t = jinja_env.get_template("404.html")
             response = t.render(error=error)
 
@@ -166,6 +165,7 @@ class ViewPostHandler(BlogHandler):
 class SignupHandler(BlogHandler):
 
     def validate_username(self, username):
+        """Use regex to validate the username"""
         USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
         if USER_RE.match(username):
             return username
@@ -173,6 +173,7 @@ class SignupHandler(BlogHandler):
             return ""
 
     def validate_password(self, password):
+        """Use regex to validate password"""
         PWD_RE = re.compile(r"^.{3,20}$")
         if PWD_RE.match(password):
             return password
@@ -180,6 +181,7 @@ class SignupHandler(BlogHandler):
             return ""
 
     def validate_verify(self, password, verify):
+        """Simple check to see if both passwords match"""
         if password == verify:
             return verify
 
@@ -189,11 +191,12 @@ class SignupHandler(BlogHandler):
         if not email:
             return ""
 
-        EMAIL_RE = re.compile(r"^[\S]+@[\S]+.[\S]+$")
+        EMAIL_RE = re.compile(r"^[\S]+@[\S]+.[\S]+$")   #If email is entered, then validate it
         if EMAIL_RE.match(email):
             return email
 
     def get(self):
+        """Use the signup template to render the signup page with any errors if needed"""
         t = jinja_env.get_template("signup.html")
         response = t.render(errors={})
         self.response.out.write(response)
@@ -208,34 +211,34 @@ class SignupHandler(BlogHandler):
             able to create a new user object and store it when we have valid data.
         """
 
-        submitted_username = self.request.get("username")
+        submitted_username = self.request.get("username")      #request user submitted data from the browser's post request
         submitted_password = self.request.get("password")
         submitted_verify = self.request.get("verify")
         submitted_email = self.request.get("email")
 
-        username = self.validate_username(submitted_username)
+        username = self.validate_username(submitted_username)   #run the validation fuc created at beginning of this class
         password = self.validate_password(submitted_password)
         verify = self.validate_verify(submitted_password, submitted_verify)
         email = self.validate_email(submitted_email)
 
-        errors = {}
-        existing_user = self.get_user_by_name(username)
+        errors = {}                                             #Create empty dictionary for potential errors
+        existing_user = self.get_user_by_name(username)         #Check to see if the submitted username already exists
         has_error = False
 
-        if existing_user:
+        if existing_user:                                       #1st verification step: if a user by that name exists, create an error
             errors['username_error'] = "A user with that username already exists"
             has_error = True
-        elif (username and password and verify and (email is not None) ):
+        elif (username and password and verify and (email is not None) ):   #If all user inputs check out...
 
-            # create new user object and store it in the database
+            # create new user object and store it in the database, including username and hashed pw
             pw_hash = hashutils.make_pw_hash(username, password)
             user = User(username=username, pw_hash=pw_hash)
             user.put()
 
-            # login our new user
+            # login our new user using the generic method from the BlogHandler
             self.login_user(user)
         else:
-            has_error = True
+            has_error = True    #if there are errors, add them to errors dict
 
             if not username:
                 errors['username_error'] = "That's not a valid username"
@@ -250,11 +253,11 @@ class SignupHandler(BlogHandler):
                 errors['email_error'] = "That's not a valid email"
 
         if has_error:
-            t = jinja_env.get_template("signup.html")
+            t = jinja_env.get_template("signup.html")       #render signup with error messages
             response = t.render(username=username, email=email, errors=errors)
             self.response.out.write(response)
         else:
-            self.redirect('/blog/newpost')
+            self.redirect('/blog/newpost')                  #After successful and signup and login, redirect to newpost
 
 class LoginHandler(BlogHandler):
 
